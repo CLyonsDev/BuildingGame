@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 
-public class ItemManager : MonoBehaviour {
+public class ItemManager : NetworkBehaviour {
 
     /*
         1- Primary Weapon
@@ -42,6 +43,9 @@ public class ItemManager : MonoBehaviour {
     // Update is called once per frame
     void Update()
     {
+        if (!isLocalPlayer)
+            return;
+
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
             SwitchItem(0);
@@ -85,6 +89,8 @@ public class ItemManager : MonoBehaviour {
                 primary.SetActive(true);
                 secondary.SetActive(false);
                 tool.SetActive(false);
+                GetComponent<Build>().isBuilding = false;
+                GetComponent<MachineGun>().enabled = true;
                 break;
             case 1:
                 itemIndex = 1;
@@ -93,6 +99,8 @@ public class ItemManager : MonoBehaviour {
                 primary.SetActive(false);
                 secondary.SetActive(true);
                 tool.SetActive(false);
+                GetComponent<Build>().isBuilding = false;
+                GetComponent<MachineGun>().enabled = false;
                 break;
             case 2:
                 itemIndex = 2;
@@ -101,8 +109,12 @@ public class ItemManager : MonoBehaviour {
                 primary.SetActive(false);
                 secondary.SetActive(false);
                 tool.SetActive(true);
+                GetComponent<Build>().isBuilding = true;
+                GetComponent<MachineGun>().enabled = false;
                 break;
         }
+
+        //CmdSwitchItem(GetComponent<NetworkIdentity>().netId, itemIndex);
 
         if(index != 2 && GetComponent<Build>().isBuilding)
         {
@@ -116,6 +128,38 @@ public class ItemManager : MonoBehaviour {
         if (build)
             buildToolModeText.text = "BUILD";
         else
-            buildToolModeText.text = "HARVEST";
+            buildToolModeText.text = "REPAIR";
+    }
+
+    [Command]
+    void CmdSwitchItem(NetworkInstanceId playerNetID, int index)
+    {
+        RpcSwitchItem(playerNetID, index);
+    }
+
+    [ClientRpc]
+    void RpcSwitchItem(NetworkInstanceId playerNetID, int index)
+    {
+        GameObject player = ClientScene.FindLocalObject(playerNetID);
+
+        switch(index)
+        {
+            case 0:
+                player.transform.Find("Gun").gameObject.SetActive(true);
+                player.transform.Find("Pistol").gameObject.SetActive(false);
+                player.transform.Find("BuildGun").gameObject.SetActive(false);
+                break;
+            case 1:
+                player.transform.Find("Gun").gameObject.SetActive(false);
+                player.transform.Find("Pistol").gameObject.SetActive(true);
+                player.transform.Find("BuildGun").gameObject.SetActive(false);
+                break;
+            case 2:
+                player.transform.Find("Gun").gameObject.SetActive(false);
+                player.transform.Find("Pistol").gameObject.SetActive(false);
+                player.transform.Find("BuildGun").gameObject.SetActive(true);
+                break;
+        }
+            
     }
 }

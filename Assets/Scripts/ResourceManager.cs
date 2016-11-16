@@ -7,14 +7,22 @@ public class ResourceManager : NetworkBehaviour {
     public GameObject[] trees;
     GameObject[] treeSpawnLoc;
 
+    int treesPerSpawnLoc = 5;
+    float radius = 4;
+
+    float pi2 = 2 * Mathf.PI;
+
 	// Use this for initialization
 	void Start () {
+
         treeSpawnLoc = GameObject.FindGameObjectsWithTag("Tree Spawn");
-        if (NetworkServer.active)
-        {
-            Debug.Log("SpawnTrees");
-            SpawnTrees();
-        }
+        //if (NetworkServer.active)
+        //{
+        //    Debug.Log("SpawnTrees");
+         //   SpawnTrees();
+        //}
+
+        //PoolManager.instance.CreatePool()
     }
 	
 	// Update is called once per frame
@@ -29,35 +37,40 @@ public class ResourceManager : NetworkBehaviour {
     {
         if (NetworkServer.active)
             CmdSpawnTrees();
-        else
-            Debug.LogError("wat not there");
     }
 
     [Command]
     void CmdSpawnTrees()
     {
-        RpcSpawnTrees(GetComponent<NetworkIdentity>().netId);
-    }
-    [ClientRpc]
-    void RpcSpawnTrees(NetworkInstanceId netID)
-    {
-        GameObject gm = ClientScene.FindLocalObject(netId);
-        gm.GetComponent<ResourceManager>().StartCoroutine(SpawnTreesEnum());
+        StartCoroutine(SpawnTreesEnum());
     }
 
     IEnumerator SpawnTreesEnum()
     {
+        if (!NetworkServer.active)
+            yield return null;
+
+        Debug.Log("SpawnTreesEnum");
         for (int i = 0; i < treeSpawnLoc.Length; i++)
         {
-            yield return new WaitForSeconds(Random.Range(0f, 0.05f));
-            if(treeSpawnLoc[i].transform.childCount > 0)
+            if (treeSpawnLoc[i].transform.childCount == 0)
             {
-                Destroy(treeSpawnLoc[i].transform.GetChild(0).gameObject);
-            }
-            GameObject tree = (GameObject)Instantiate(trees[Random.Range(0, trees.Length)], treeSpawnLoc[i].transform, false);
-            NetworkServer.Spawn(tree);
-            tree.transform.position = tree.transform.parent.position;
-            tree.transform.Rotate(Vector3.up * Random.Range(0, 360));
+                for (int j = 0; j < treesPerSpawnLoc; j++)
+                {
+                    yield return new WaitForSeconds(0.0000001f);
+                
+                    Vector3 pos = treeSpawnLoc[i].transform.position + new Vector3(Mathf.Cos(j * pi2 / treesPerSpawnLoc) * radius, 0, Mathf.Sin(j * pi2 / treesPerSpawnLoc) * radius);
+                    GameObject tree = (GameObject)Instantiate(trees[Random.Range(0, trees.Length)], pos, Quaternion.identity);
+
+                    if(NetworkServer.active)
+                    {
+                        NetworkServer.Spawn(tree);
+                    }
+
+                    tree.transform.Rotate(Vector3.up * Random.Range(0, 360));
+                    tree.transform.SetParent(treeSpawnLoc[i].transform, true);
+                }
+            }  
         }
     }
 }

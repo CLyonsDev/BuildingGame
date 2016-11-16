@@ -20,6 +20,8 @@ public class Build : NetworkBehaviour {
 
     public bool isBuilding = true;
 
+    public Material ghostBrickMaterial;
+
     // Use this for initialization
     void Start () {
 	
@@ -34,15 +36,22 @@ public class Build : NetworkBehaviour {
         }
 
         if (!isBuilding)
+        {
+            if(ghostBrick != null)
+                Destroy(ghostBrick);
             return;
+        }
 
         //Create a ghost brick if we don't already have one.
-	    if(ghostBrick == null)
+        if (ghostBrick == null)
         {
             //CmdCreateGhostBrick();
             ghostBrick = (GameObject)Instantiate(bricks[brickIndex]);
+            ghostBrick.GetComponentInChildren<Collider>().enabled = false;
+            ghostBrick.GetComponentInChildren<Rigidbody>().isKinematic = true;
             ghostBrick.layer = LayerMask.NameToLayer("Ignore Raycast");
             ghostBrick.transform.GetChild(0).gameObject.layer = LayerMask.NameToLayer("Ignore Raycast");
+            ghostBrick.GetComponentInChildren<Renderer>().material = ghostBrickMaterial;
         }
 
         //Snapping
@@ -68,20 +77,27 @@ public class Build : NetworkBehaviour {
             {
                 if (passiveRayHitInfo.transform.gameObject.layer != LayerMask.NameToLayer("Buildable") && passiveRayHitInfo.transform.gameObject.layer != LayerMask.NameToLayer("Brick"))
                     return;
+
                 Vector3 posToMoveTo = Vector3.zero;
                 if (!snapping)
                 {
-                   posToMoveTo = new Vector3(Mathf.Round(passiveRayHitInfo.point.x / 0.25f) * 0.25f,
-                                             Mathf.Round(passiveRayHitInfo.point.y / 0.5f) * 0.5f,
-                                             Mathf.Round(passiveRayHitInfo.point.z / 0.25f) * 0.25f);
+                    posToMoveTo = new Vector3(Mathf.Round(passiveRayHitInfo.point.x / 0.25f) * 0.25f,
+                                              Mathf.Round(passiveRayHitInfo.point.y / 0.5f) * 0.5f,
+                                              Mathf.Round(passiveRayHitInfo.point.z / 0.25f) * 0.25f);
+                    //posToMoveTo = new Vector3(RoundToHalf(passiveRayHitInfo.point.x), RoundToHalf(passiveRayHitInfo.point.y), RoundToHalf(passiveRayHitInfo.point.z));
                 }
                 else
                 {
+                    if (passiveRayHitInfo.transform.gameObject.layer == LayerMask.NameToLayer("Buildable"))
+                        return;
+
                     posToMoveTo = new Vector3(passiveRayHitInfo.transform.position.x, 
                                               passiveRayHitInfo.transform.position.y
-                                                + passiveRayHitInfo.transform.GetComponent<Collider>().bounds.extents.y / 2
-                                                + ghostBrick.transform.GetChild(0).GetComponent<Collider>().bounds.extents.y / 2, 
+                                                + passiveRayHitInfo.transform.GetComponentInChildren<Collider>().bounds.size.y
+                                                + ghostBrick.transform.GetChild(0).GetComponent<Collider>().bounds.size.y , 
                                               passiveRayHitInfo.transform.position.z);
+                    //posToMoveTo = new Vector3(passiveRayHitInfo.transform.position.x, passiveRayHitInfo.transform.position.y + ghostBrick.GetComponentInChildren<Renderer>().bounds.size.y, passiveRayHitInfo.transform.position.z); //+ ghostBrick.GetComponent<Renderer>().bounds.size.y
+
 
                     //Debug.Log(posToMoveTo);
                 }
@@ -94,7 +110,7 @@ public class Build : NetworkBehaviour {
         //Creating brick
         if(Input.GetMouseButtonDown(0))
         {
-            Debug.Log(ghostBrick.transform.position);
+            //Debug.Log(ghostBrick.transform.position);
             Vector3 pos = ghostBrick.transform.position;
             CmdCreateBrick(pos, brickIndex, brickRot);
             //CmdTestCmd();
@@ -104,16 +120,21 @@ public class Build : NetworkBehaviour {
             RaycastHit hit;
             if(Physics.Raycast(brickDestroyRay, out hit, destroyLM))
             {
-                CmdDestroyBrick(hit.transform.parent.gameObject.GetComponent<NetworkIdentity>().netId);
+                CmdDestroyBrick(hit.transform.gameObject.GetComponentInChildren<NetworkIdentity>().netId);
             }
         }
 
         if(Input.GetAxis("Mouse ScrollWheel") > 0)
         {
             if (brickIndex + 1 < bricks.Length)
+            {
                 brickIndex++;
+
+            }
             else
+            {
                 brickIndex = 0;
+            }
 
             CmdChangeGhost(ghostBrick.GetComponent<NetworkIdentity>().netId);
             Destroy(ghostBrick);
@@ -128,6 +149,11 @@ public class Build : NetworkBehaviour {
             Destroy(ghostBrick);
         }
 	}
+
+    public static float RoundToHalf(float f)
+    {
+        return f = Mathf.Round(f * 4f) * 0.25f;
+    }
 
     public void ToggleIfBuilding()
     {
@@ -171,13 +197,13 @@ public class Build : NetworkBehaviour {
     {
         //Debug.Log("spawn rpc");
         GameObject newBrick = (GameObject)Instantiate(bricks[brickGOIndex], pos, rot);
-
+        newBrick.transform.tag = "Brick";
+        newBrick.layer = LayerMask.NameToLayer("Brick");
         NetworkServer.Spawn(newBrick);
 
         //newBrick.transform.position = pos;
         //newBrick.transform.rotation = rot;
         //RpcCreateBrick(pos, brickToSpawn, rot);
-        Debug.Log("spawn cmd");
     }
 
     [ClientRpc]

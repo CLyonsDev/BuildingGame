@@ -18,7 +18,7 @@ public class HarvestResources : NetworkBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        if (GetComponent<Build>().isBuilding == false)
+        if (GetComponent<Build>().isBuilding == true)
         {
             return;
         }
